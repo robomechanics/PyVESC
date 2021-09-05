@@ -3,29 +3,11 @@ from pyvesc.VESC.messages import *
 import time
 import threading
 
-# because people may want to use this library for their own messaging, do not make this a required package
-try:
-    import serial
-except ImportError:
-    serial = None
-
-
 class VESC(object):
-    def __init__(self, serial_port, has_sensor=False, start_heartbeat=True, baudrate=115200, timeout=0.05):
-        """
-        :param serial_port: Serial device to use for communication (i.e. "COM3" or "/dev/tty.usbmodem0")
-        :param has_sensor: Whether or not the bldc motor is using a hall effect sensor
-        :param start_heartbeat: Whether or not to automatically start the heartbeat thread that will keep commands
-                                alive.
-        :param baudrate: baudrate for the serial communication. Shouldn't need to change this.
-        :param timeout: timeout for the serial communication
-        """
-
-        if serial is None:
-            raise ImportError("Need to install pyserial in order to use the VESCMotor class.")
-
-        self.serial_port = serial.Serial(port=serial_port, baudrate=baudrate, timeout=timeout)
-        if has_sensor:
+    def __init__(self, serial_port, can_id=None, has_sensor=True, start_heartbeat=False):
+    	self.serial_port = serial_port
+        
+	if has_sensor:
             self.serial_port.write(encode(SetRotorPositionMode(SetRotorPositionMode.DISP_POS_OFF)))
 
         self.heart_beat_thread = threading.Thread(target=self._heartbeat_cmd_func)
@@ -33,14 +15,15 @@ class VESC(object):
 
         if start_heartbeat:
             self.start_heartbeat()
-
+	"""
         # check firmware version and set GetValue fields to old values if pre version 3.xx
         version = self.get_firmware_version()
         if int(version.split('.')[0]) < 3:
             GetValues.fields = pre_v3_33_fields
+	"""
 
         # store message info for getting values so it doesn't need to calculate it every time
-        msg = GetValues()
+        msg = GetValues(can_id=can_id)
         self._get_values_msg = encode_request(msg)
         self._get_values_msg_expected_length = msg._full_msg_size
 
@@ -96,25 +79,25 @@ class VESC(object):
         Set the electronic RPM value (a.k.a. the RPM value of the stator)
         :param new_rpm: new rpm value
         """
-        self.write(encode(SetRPM(new_rpm)))
+        self.write(encode(SetRPM(new_rpm,can_id=self.can_id)))
 
     def set_current(self, new_current):
         """
         :param new_current: new current in milli-amps for the motor
         """
-        self.write(encode(SetCurrent(new_current)))
+        self.write(encode(SetCurrent(new_current,can_id=self.can_id)))
 
     def set_duty_cycle(self, new_duty_cycle):
         """
         :param new_duty_cycle: Value of duty cycle to be set (range [-1e5, 1e5]).
         """
-        self.write(encode(SetDutyCycle(new_duty_cycle)))
+        self.write(encode(SetDutyCycle(new_duty_cycle,can_id=self.can_id)))
 
     def set_servo(self, new_servo_pos):
         """
         :param new_servo_pos: New servo position. valid range [0, 1]
         """
-        self.write(encode(SetServoPosition(new_servo_pos)))
+        self.write(encode(SetServoPosition(new_servo_pos,can_id=self.can_id)))
 
     def get_measurements(self):
         """
@@ -124,7 +107,7 @@ class VESC(object):
 
     def get_firmware_version(self):
         msg = GetVersion()
-        return str(self.write(encode_request(msg), num_read_bytes=msg._full_msg_size))
+        return str(self.write(encode_request(msg,can_id=self.can_id), num_read_bytes=msg._full_msg_size))
 
     def get_rpm(self):
         """
