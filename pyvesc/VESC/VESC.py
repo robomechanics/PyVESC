@@ -5,25 +5,26 @@ import threading
 
 class VESC(object):
     def __init__(self, serial_port, can_id=None, has_sensor=True, start_heartbeat=False):
-    	self.serial_port = serial_port
-        
-	if has_sensor:
-            self.serial_port.write(encode(SetRotorPositionMode(SetRotorPositionMode.DISP_POS_OFF)))
+        self.serial_port = serial_port
+        self.can_id = can_id
+
+        if has_sensor:
+            self.serial_port.write(encode(SetRotorPositionMode(SetRotorPositionMode.DISP_POS_OFF,can_id=self.can_id)))
 
         self.heart_beat_thread = threading.Thread(target=self._heartbeat_cmd_func)
         self._stop_heartbeat = threading.Event()
 
         if start_heartbeat:
             self.start_heartbeat()
-	"""
+        """
         # check firmware version and set GetValue fields to old values if pre version 3.xx
         version = self.get_firmware_version()
         if int(version.split('.')[0]) < 3:
             GetValues.fields = pre_v3_33_fields
-	"""
+        """
 
         # store message info for getting values so it doesn't need to calculate it every time
-        msg = GetValues(can_id=can_id)
+        msg = GetValues(can_id=self.can_id)
         self._get_values_msg = encode_request(msg)
         self._get_values_msg_expected_length = msg._full_msg_size
 
@@ -32,9 +33,6 @@ class VESC(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop_heartbeat()
-        if self.serial_port.is_open:
-            self.serial_port.flush()
-            self.serial_port.close()
 
     def _heartbeat_cmd_func(self):
         """
@@ -67,12 +65,15 @@ class VESC(object):
         :param num_read_bytes: number of bytes to read for decoding response
         :return: decoded response from buffer
         """
-        self.serial_port.write(data)
-        if num_read_bytes is not None:
-            while self.serial_port.in_waiting <= num_read_bytes:
-                time.sleep(0.000001)  # add some delay just to help the CPU
-            response, consumed = decode(self.serial_port.read(self.serial_port.in_waiting))
-            return response
+        try:
+            self.serial_port.write(data)
+            if num_read_bytes is not None:
+                while self.serial_port.in_waiting <= num_read_bytes:
+                    time.sleep(0.000001)  # add some delay just to help the CPU
+                response, consumed = decode(self.serial_port.read(self.serial_port.in_waiting))
+                return response
+        except:
+            return None
 
     def set_rpm(self, new_rpm):
         """
