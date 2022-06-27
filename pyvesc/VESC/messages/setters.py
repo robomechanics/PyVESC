@@ -21,7 +21,7 @@ class SetRPM(metaclass=VESCMessage):
     """
     id = VedderCmd.COMM_SET_RPM
     fields = [
-        ('rpm', 'i')
+        ('rpm', 'i',0.001)
     ]
 
 

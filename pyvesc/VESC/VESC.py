@@ -80,7 +80,7 @@ class VESC(object):
         Set the electronic RPM value (a.k.a. the RPM value of the stator)
         :param new_rpm: new rpm value
         """
-        self.write(encode(SetRPM(new_rpm,can_id=self.can_id)))
+        self.write(encode(SetRPM(int(new_rpm*1000),can_id=self.can_id)))
 
     def set_current(self, new_current):
         """

@@ -1,5 +1,6 @@
 from pyvesc.protocol.interface import encode_request, encode, decode
 from pyvesc.VESC.messages import *
+from pyvesc.VESC.VESC import VESC
 import time
 import serial
 
